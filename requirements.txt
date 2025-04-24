@@ -1,0 +1,8 @@
+msal
+requests
+pdfplumber
+pytesseract
+pillow
+pdf2image
+openpyxl
+python-dotenv
