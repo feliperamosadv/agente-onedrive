@@ -1,52 +1,49 @@
 import os
-from modules.onedrive_connector import get_token, listar_arquivos
-from modules.analyzer import analisar_arquivo
-from modules.mover import mover_arquivo
-from modules.relatorio import registrar_acao
+import requests
+from msal import ConfidentialClientApplication
+from dotenv import load_dotenv
 
-# Caminho onde os arquivos serão salvos temporariamente (você pode ajustar)
-PASTA_TEMPORARIA = "downloads"
-BASE_DESTINO = "Pessoa Jurídica"
+# Carrega as variáveis do arquivo .env
+load_dotenv()
 
-def baixar_arquivo(url_download, nome_arquivo, token):
-    import requests
+def get_token():
+    # 🔍 DEBUG: Verifica se todas as variáveis estão sendo carregadas corretamente
+    print("🧪 CLIENT_ID:", os.getenv("CLIENT_ID"))
+    print("🧪 CLIENT_SECRET:", os.getenv("CLIENT_SECRET"))
+    print("🧪 TENANT_ID:", os.getenv("TENANT_ID"))
+    print("🧪 AUTHORITY:", os.getenv("AUTHORITY"))
+    print("📌 SCOPE carregado:", os.getenv("SCOPE"))
+
+    # Inicializa o cliente MSAL com as credenciais
+    app = ConfidentialClientApplication(
+        client_id=os.getenv("CLIENT_ID"),
+        client_credential=os.getenv("CLIENT_SECRET"),
+        authority=os.getenv("AUTHORITY")
+    )
+
+    # Solicita o token
+    result = app.acquire_token_for_client(scopes=[os.getenv("SCOPE")])
+    print("[DEBUG] Conteúdo da resposta:", result)
+
+    # Retorna o token de acesso
+    return result["access_token"]
+
+def listar_arquivos(token, pasta_id=None):
+    url_base = "https://graph.microsoft.com/v1.0/me/drive"
+
+    if pasta_id:
+        url = f"{url_base}/items/{pasta_id}/children"
+    else:
+        url = f"{url_base}/root/children"
+
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(url_download, headers=headers)
-    
-    os.makedirs(PASTA_TEMPORARIA, exist_ok=True)
-    caminho_local = os.path.join(PASTA_TEMPORARIA, nome_arquivo)
-    
-    with open(caminho_local, "wb") as f:
-        f.write(response.content)
+    response = requests.get(url, headers=headers)
 
-    return caminho_local
+    if response.status_code == 200:
+        return response.json().get("value", [])
+    else:
+        print(f"[ERRO] Falha ao listar arquivos: {response.status_code}")
+        print("[ERRO] Resposta da API:", response.text)
+        return []
 
-def main():
-    print("🔐 Autenticando no OneDrive...")
-    token = get_token()
-    
-    print("📂 Buscando arquivos do OneDrive...")
-    arquivos = listar_arquivos(token)
-
-    if not arquivos:
-        print("⚠️ Nenhum arquivo encontrado.")
-        return
-
-    for arquivo in arquivos:
-        nome = arquivo.get("name")
-        url_download = arquivo.get("@microsoft.graph.downloadUrl")
-
-        print(f"\n📄 Arquivo encontrado: {nome}")
-        caminho_local = baixar_arquivo(url_download, nome, token)
-
-        categoria = analisar_arquivo(caminho_local)
-        print(f"📚 Categoria sugerida: {categoria}")
-
-        if input("Deseja mover este arquivo? (s/n): ").lower() == "s":
-            destino = mover_arquivo(caminho_local, BASE_DESTINO, categoria)
-            registrar_acao(caminho_local, destino, categoria)
-        else:
-            print("⏭️ Arquivo ignorado.")
-
-if __name__ == "__main__":
-    main()
+        # Testando nova execução após corrigir secrets
