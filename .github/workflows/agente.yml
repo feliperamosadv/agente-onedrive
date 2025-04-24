@@ -1,11 +1,10 @@
 name: Run Agente OneDrive
 
 on:
-  push:
-    branches: ["main"]
-  workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *" # Executa às 3h UTC (0h no Brasil)
+    - cron: "*/15 * * * *" # Executa a cada 15 minutos
+    - cron: "0 3 * * *" # Também executa todo dia às 3h UTC (opcional)
+  workflow_dispatch: # Permite executar manualmente
 
 jobs:
   run-script:
